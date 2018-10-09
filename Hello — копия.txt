@@ -1,2 +1,3 @@
 Hello world!
+Add new line 1
 Add new line 2
