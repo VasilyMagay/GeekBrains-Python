@@ -1,5 +1,8 @@
 import yaml
 import json
+import logging
+import server_log_config
+
 from socket import socket
 from argparse import ArgumentParser
 
@@ -28,17 +31,19 @@ if args.config:
 
 host, port = (default_config.get('host'), default_config.get('port'))
 
+logger = logging.getLogger('app.main')
+
 try:
 
     sock = socket()
     sock.bind((host, port,))
     sock.listen(5)
 
-    print(f'Server was started with {host}:{port}')
+    logger.info(f'Server was started with {host}:{port}')
 
     while True:
         client, address = sock.accept()
-        print(f'Clietn was connected with {address[0]}:{address[1]}')
+        logger.info(f'Clietn was connected with {address[0]}:{address[1]}')
         b_request = client.recv(default_config.get('buffersize'))
         request = json.loads(b_request.decode())
 
@@ -47,16 +52,16 @@ try:
             controller = resolve(action_name)
             if controller:
                 try:
-                    print(f'Controller {action_name} resolved with request: {request}')
+                    logger.info(f'Controller {action_name} resolved with request: {request}')
                     response = controller(request)
                 except Exception as err:
-                    print(f'Controller {action_name} error: {err}')
+                    logger.error(f'Controller {action_name} error: {err}')
                     response = make_response(request, 500, 'Internal server error')
             else:
-                print(f'Controller {action_name} not found')
+                logger.error(f'Controller {action_name} not found')
                 response = make_response(request, 404, f'Action with name {action_name} not supported')
         else:
-            print(f'Controller wrong request: {request}')
+            logger.error(f'Controller wrong request: {request}')
             response = make_response(request, 400, 'wrong request format')
 
         client.send(
@@ -66,4 +71,4 @@ try:
         client.close()
 
 except KeyboardInterrupt:
-    print('Server shutdown')
+    logger.info('Server shutdown')
