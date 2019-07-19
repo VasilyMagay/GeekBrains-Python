@@ -1,9 +1,10 @@
 import yaml
 import json
+import logging
+import client_log_config
 from socket import socket
 from datetime import datetime
 from argparse import ArgumentParser
-
 
 parser = ArgumentParser()
 
@@ -30,7 +31,9 @@ sock.connect(
     (default_config.get('host'), default_config.get('port'))
 )
 
-print(f'Client was started')
+logger = logging.getLogger('app.main')
+
+logger.info(f'Client was started')
 
 action = input('Enter action: ')
 data = input('Enter data: ')
@@ -44,6 +47,6 @@ request = {
 s_request = json.dumps(request)
 
 sock.send(s_request.encode())
-print(f'Client send data: {data}')
+logger.info(f'Client send data: {data}')
 b_response = sock.recv(default_config.get('buffersize'))
-print(b_response.decode())
+logger.info(b_response.decode())
