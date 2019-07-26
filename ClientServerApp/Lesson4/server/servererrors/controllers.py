@@ -4,6 +4,5 @@ from decorators import logged, login_required
 
 @logged
 @login_required
-def echo_controller(request):
-    data = request.get('data')
-    return make_response(request, 200, data)
+def server_error_controller(request):
+    raise Exception('Server error message')
