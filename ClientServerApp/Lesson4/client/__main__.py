@@ -2,6 +2,7 @@ import yaml
 import json
 import logging
 import client_log_config
+import hashlib
 from socket import socket
 from datetime import datetime
 from argparse import ArgumentParser
@@ -35,13 +36,19 @@ logger = logging.getLogger('app.main')
 
 logger.info(f'Client was started')
 
+hash_obj = hashlib.sha256()
+hash_obj.update(
+    str(datetime.now().timestamp()).encode()
+)
+
 action = input('Enter action: ')
 data = input('Enter data: ')
 
 request = {
     'action': action,
     'time': datetime.now().timestamp(),
-    'data': data
+    'data': data,
+    'token': hash_obj.hexdigest()
 }
 
 s_request = json.dumps(request)
