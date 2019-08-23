@@ -4,7 +4,25 @@ import logging.handlers as handlers
 from argparse import ArgumentParser
 from handlers import handle_default_request
 from app import Server
+from database import create_tables
 
+
+parser = ArgumentParser()
+
+parser.add_argument(
+    '-c', '--config', type=str,
+    required=False, help='Sets config file path'
+)
+
+parser.add_argument(
+    '-m', '--migrate', action='store_true', help='Create new database'
+)
+
+args = parser.parse_args()
+
+if args.migrate:
+    create_tables()
+    exit(0)
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -14,15 +32,6 @@ logging.basicConfig(
         logging.StreamHandler()
     ]
 )
-
-parser = ArgumentParser()
-
-parser.add_argument(
-    '-c', '--config', type=str,
-    required=False, help='Sets config file path'
-)
-
-args = parser.parse_args()
 
 default_config = {
     'host': 'localhost',
@@ -35,13 +44,10 @@ if args.config:
         file_config = yaml.load(file, Loader=yaml.Loader)
         default_config.update(file_config)
 
-my_server = Server(
-    default_config.get('host'),
-    default_config.get('port'),
-    default_config.get('buffersize'),
-    handle_default_request
-)
-
-my_server.start()
-my_server.processing()
-
+with Server(
+            default_config.get('host'),
+            default_config.get('port'),
+            default_config.get('buffersize'),
+            handle_default_request) as my_server:
+    my_server.start()
+    my_server.processing()

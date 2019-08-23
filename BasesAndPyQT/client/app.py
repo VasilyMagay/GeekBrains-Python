@@ -41,7 +41,7 @@ class Client(metaclass=ClientVerifier):
     def read(self):
         while True:
             try:
-                compressed_response = self._sock.recv(self._buffer_size)
+                compressed_response = self._sock.recv(self._buffersize)
             except Exception:
                 pass
             else:
@@ -57,9 +57,14 @@ class Client(metaclass=ClientVerifier):
         request = {
             'action': action,
             'time': datetime.now().timestamp(),
-            'data': data,
+            # 'data': data,
             'token': hash_obj.hexdigest()
         }
+
+        if isinstance(data, dict):
+            request.update(data)
+        else:
+            request['data'] = data
 
         s_request = json.dumps(request)
         b_request = zlib.compress(s_request.encode())

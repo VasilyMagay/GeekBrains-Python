@@ -1,22 +1,11 @@
-from sqlalchemy.orm import sessionmaker
-from models import (
-    Base, engine, Client, ClientHistory
-)
+from database import Base, import_models, Session
 
-
-def new_session():
-    # начинаем новую сессию работы с БД
-    Session = sessionmaker(bind=engine)
-    return Session()
-
-
-def create_tables():
-    Base.metadata.create_all(engine)
+import_models()
 
 
 def add_client(login, info):
 
-    session = new_session()
+    session = Session()
 
     # добавить новый элемент
     new_element = Client(login, info)
@@ -28,7 +17,7 @@ def add_client(login, info):
 
 def print_clients():
 
-    session = new_session()
+    session = Session()
 
     # посмотрим что уже есть в базе данных
     for instance in session.query(Client).order_by(Client.id):
@@ -37,7 +26,7 @@ def print_clients():
 
 def add_history(client_id, ip):  # Для тестирования
 
-    session = new_session()
+    session = Session()
 
     # добавить новый элемент
     new_element = ClientHistory(client_id, ip)
@@ -49,7 +38,7 @@ def add_history(client_id, ip):  # Для тестирования
 
 def print_history():
 
-    session = new_session()
+    session = Session()
 
     # посмотрим что уже есть в базе данных
     for instance in session.query(ClientHistory).order_by(ClientHistory.id):
