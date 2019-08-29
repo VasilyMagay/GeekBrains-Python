@@ -7,3 +7,4 @@ pytest-cov
 fabric3
 tabulate
 sqlalchemy
+PyQt5
