@@ -7,6 +7,10 @@ def server():
     local('python server')
 
 
+def migrate():
+    local('python server -m')
+
+
 def client():
     local('python client')
 
@@ -30,3 +34,7 @@ def clients(num):
             proc = subprocess.Popen('python client', creationflags=subprocess.CREATE_NEW_CONSOLE)
         else:
             proc = subprocess.Popen('python client', shell=True)
+
+
+def client_admin():
+    local('python client -a')

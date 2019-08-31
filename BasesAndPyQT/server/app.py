@@ -22,9 +22,24 @@ class Server(metaclass=ServerVerifier):
         self._handler = handler
         self._connections = list()
         self._requests = list()
-        self._sock = socket()
+        self._sock = None
+
+    def __enter__(self):
+        if not self._sock:
+            self._sock = socket()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        message = 'Server shutdown'
+        if exc_type:
+            if not exc_type is KeyboardInterrupt:
+                message = f'Server stopped with error ({exc_type}, {exc_val})'
+        logging.info(message)
+        return True
 
     def start(self, backlog=5):
+        if not self._sock:
+            self._sock = socket()
         self._sock.bind((self._host, self._port,))
         self._sock.settimeout(0)  # sock.setblocking(False)
         self._sock.listen(backlog)
