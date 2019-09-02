@@ -8,3 +8,4 @@ fabric3
 tabulate
 sqlalchemy
 PyQt5
+pycryptodome
