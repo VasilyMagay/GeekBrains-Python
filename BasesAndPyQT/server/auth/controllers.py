@@ -1,3 +1,5 @@
+"""The __controllers__ docstr"""
+
 from protocol import make_response
 from decorators import logged
 from .decorators import login_required
@@ -16,6 +18,8 @@ import_models()
 @logged
 @login_required
 def get_users_controller(request):
+    """Get Users Controller."""
+
     session = Session()
     data = reduce(
         lambda value, item: value + [{'id': item.id, 'name': item.name}],
@@ -50,21 +54,22 @@ def del_user_controller(request):
 def login_controller(request):
     errors = {}
     is_valid = True
+    data = request.get('data')
 
     if not 'time' in request:
-        errors.update({'time': 'Attribute is required'})
+        errors.update({'time': 'Request attribute is required'})
         is_valid = False
-    if not 'password' in request:
-        errors.update({'password': 'Attribute is required'})
+    if not 'password' in data:
+        errors.update({'password': 'Data attribute is required'})
         is_valid = False
-    if not 'login' in request:
-        errors.update({'login': 'Attribute is required'})
+    if not 'login' in data:
+        errors.update({'login': 'Data attribute is required'})
         is_valid = False
 
     if not is_valid:
         return make_response(request, 400, {'errors': errors})
 
-    user = authenticate(request.get('login'), request.get('password'))
+    user = authenticate(data.get('login'), data.get('password'))
 
     if user:
         token = login(request, user)
@@ -76,25 +81,28 @@ def login_controller(request):
 def registration_controller(request):
     errors = {}
     is_valid = True
+    data = request.get('data')
 
-    if not 'password' in request:
-        errors.update({'password': 'Attribute is required'})
+    if not 'password' in data:
+        errors.update({'password': 'Data attribute is required'})
         is_valid = False
-    if not 'login' in request:
-        errors.update({'login': 'Attribute is required'})
+    if not 'login' in data:
+        errors.update({'login': 'Data attribute is required'})
         is_valid = False
 
     if not is_valid:
         return make_response(request, 400, {'errors': errors})
 
-    hmac_obj = hmac.new(SECRET_KEY, request.get('password'))
+    # сокрытие пароля для хранения на сервере
+    hmac_obj = hmac.new(SECRET_KEY.encode(), data.get('password').encode())
     password_digest = hmac_obj.digest()
 
     with session_scope() as db_session:
-        user = User(name=request.get('login'), password=password_digest)
+        user = User(name=data.get('login'), password=password_digest)
         db_session.add(user)
-        token = login(request, user)
-        return make_response(request, 200, {'token': token})
+
+    token = login(request, user)
+    return make_response(request, 200, {'token': token})
 
 
 @login_required

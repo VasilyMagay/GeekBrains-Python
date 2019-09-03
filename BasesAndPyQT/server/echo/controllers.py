@@ -1,6 +1,7 @@
 from protocol import make_response
-from decorators import logged, login_required
-from database import Base, import_models, Session
+from decorators import logged
+from auth.decorators import login_required
+from database import Base, import_models, Session, session_scope
 from functools import reduce
 from .models import Message
 
@@ -15,6 +16,7 @@ def echo_controller(request):
     message = Message(data=data)
     session.add(message)
     session.commit()
+    session.close()
     return make_response(request, 200, data)
 
 
@@ -28,3 +30,23 @@ def get_messages_controller(request):
         []
     )
     return make_response(request, 200, messages)
+
+
+def delete_message_controller(request):
+    data = request.get('data')
+    message_id = data.get('message_id')
+    with session_scope() as session:
+        message = session.query(Message).filter_by(id=message_id).first()
+        session.delete(message)
+    return make_response(request, 200)
+
+
+def update_message_controller(request):
+    message_id = request.get('message_id')
+    message_data = request.get('message_data')
+    session = Session()
+    message = session.query(Message).filter_by(id=message_id).first()
+    message.data = message_data
+    session.commit()
+    session.close()
+    return make_response(request, 200)

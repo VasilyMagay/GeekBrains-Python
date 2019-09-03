@@ -6,7 +6,6 @@ from sqlalchemy.orm import relationship
 from database import Base, import_models
 from datetime import datetime
 
-
 import_models()
 
 
