@@ -1,0 +1,4 @@
+graft src
+exclude MANIFEST.in
+exclude setup.cfg
+exclude setup.py

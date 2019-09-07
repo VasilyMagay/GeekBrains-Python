@@ -1,0 +1,13 @@
+Metadata-Version: 1.1
+Name: echo-server
+Version: 1.0.0.0
+Summary: Echo server template
+Home-page: UNKNOWN
+Author: Vasily Magay
+Author-email: org6cfpcsjk7@mail.ru
+License: UNKNOWN
+Description: UNKNOWN
+Platform: UNKNOWN
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
