@@ -38,3 +38,7 @@ def clients(num):
 
 def client_admin():
     local('python client -a')
+
+
+def apidoc():
+    local('sphinx-apidoc -o docs/source server')

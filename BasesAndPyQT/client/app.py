@@ -12,6 +12,12 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5 import QtCore
 
+from array import array
+from itertools import islice
+
+from Crypto.Cipher import AES
+from Crypto.Random import get_random_bytes
+
 
 class Client(QMainWindow):
     def __init__(self, host, port, buffersize):
@@ -44,32 +50,42 @@ class Client(QMainWindow):
             except Exception:
                 pass
             else:
-                b_response = zlib.decompress(compressed_response)
-                s_response = b_response.decode()
-                logging.info(s_response)
-                self.message_list.setPlainText(s_response)
+                encrypted_response = zlib.decompress(compressed_response)
+
+                nonce, encrypted_response = get_chunk(encrypted_response, 16)
+                key, encrypted_response = get_chunk(encrypted_response, 16)
+                tag, encrypted_response = get_chunk(encrypted_response, 16)
+
+                cipher = AES.new(key, AES.MODE_EAX, nonce)
+
+                raw_response = cipher.decrypt_and_verify(encrypted_response, tag)
+                string_response = raw_response.decode()
+
+                logging.info(string_response)
+                self.message_list.setPlainText(string_response)
 
     def send(self, action, data):
         hash_obj = hashlib.sha256()
         hash_obj.update(
             str(datetime.now().timestamp()).encode()
         )
+        token = hash_obj.hexdigest()
 
-        request = {
-            'action': action,
-            'time': datetime.now().timestamp(),
-            # 'data': data,
-            'token': hash_obj.hexdigest()
-        }
+        request = make_request(action, data, token)
+        byte_request = json.dumps(request).encode()
 
-        if isinstance(data, dict):
-            request.update(data)
-        else:
-            request['data'] = data
+        key = get_random_bytes(16)
+        cipher = AES.new(key, AES.MODE_EAX)
+        encrypt_request, tag = cipher.encrypt_and_digest(byte_request)
 
-        s_request = json.dumps(request)
-        b_request = zlib.compress(s_request.encode())
-        self._sock.send(b_request)
+        # cipher.nonce - идентификатор шифра
+        compress_request = zlib.compress(
+            b'%(nonce)s%(key)s%(tag)s%(data)s' % {
+                b'nonce': cipher.nonce, b'key': key, b'tag': tag, b'data': encrypt_request
+            }
+        )
+
+        self._sock.send(compress_request)
         logging.info(f'Client send data: {data}')
 
     def stop(self):
@@ -101,7 +117,6 @@ class Client(QMainWindow):
         # main_layout.addWidget(self.message_text, 0, 1)
         # main_layout.addWidget(self.send_button, 1, 0)
 
-
         central_widget = QWidget()
         central_widget.setLayout(main_layout)
 
@@ -113,3 +128,23 @@ class Client(QMainWindow):
 
     def click_send_button(self):
         self.send('echo', self.message_text.toPlainText())
+
+
+def get_chunk(text, size):
+    text_iter = (char for char in text)
+    chunk = array('B', islice(text_iter, size)).tobytes()
+    text_residue = array('B', text_iter).tobytes()
+    return chunk, text_residue
+
+
+def make_request(action, data, token):
+    request = {
+        'action': action,
+        'time': datetime.now().timestamp(),
+        'token': token
+    }
+    if isinstance(data, dict):
+        request.update(data)
+    else:
+        request['data'] = data
+    return request
