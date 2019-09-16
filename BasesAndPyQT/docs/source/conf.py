@@ -15,6 +15,7 @@ import sys
 
 PROJECT_DIR = 'C:\\MD\\Python Projects\\GeekBrains\\BasesAndPyQT'
 sys.path.insert(0, os.path.abspath(os.path.join(PROJECT_DIR, 'server')))
+# sys.path.insert(0, os.path.abspath('../server'))
 
 # -- Project information -----------------------------------------------------
 
