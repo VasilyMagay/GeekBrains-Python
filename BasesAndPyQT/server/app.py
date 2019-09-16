@@ -4,17 +4,7 @@ import logging
 from socket import socket
 
 
-class ServerVerifier(type):
-    def __new__(cls, clsname, bases, clsdict):
-        return type.__new__(cls, clsname, bases, clsdict)
-
-    def __init__(self, clsname, bases, clsdict):
-        # for key, value in clsdict.items():
-        #     print(f'{key}={value}')
-        type.__init__(self, clsname, bases, clsdict)
-
-
-class Server(metaclass=ServerVerifier):
+class Server:
     def __init__(self, host, port, buffersize, handler):
         self._host = host
         self._port = port
@@ -31,10 +21,14 @@ class Server(metaclass=ServerVerifier):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         message = 'Server shutdown'
+        if self._sock:
+            self._sock.close()
         if exc_type:
             if not exc_type is KeyboardInterrupt:
                 message = f'Server stopped with error ({exc_type}, {exc_val})'
-        logging.info(message)
+            logging.error(message, exc_info=exc_val)
+        else:
+            logging.info(message)
         return True
 
     def start(self, backlog=5):
@@ -56,41 +50,41 @@ class Server(metaclass=ServerVerifier):
             logging.info(f'Client was connected with {address[0]}:{address[1]} | Connections: {len(self._connections)}')
 
     def processing(self):
-        try:
-            while True:
 
-                self.wait_client()
+        while True:
 
-                if not self._connections:  # Без данной проверки выдает ошибку при первом старте
-                    continue
+            self.wait_client()
 
-                rlist, wlist, xlist = select.select(
-                    self._connections, self._connections, self._connections, 0
+            if not self._connections:  # Без данной проверки выдает ошибку при первом старте
+                continue
+
+            rlist, wlist, xlist = select.select(
+                self._connections, self._connections, self._connections, 0
+            )
+
+            for r_client in rlist:
+                r_thread = threading.Thread(
+                    target=self.read, args=(r_client,)
                 )
+                r_thread.start()
 
-                for r_client in rlist:
-                    r_thread = threading.Thread(
-                        target=self.read, args=(r_client,)
+            if self._requests:
+                b_request = self._requests.pop()
+                b_response = self._handler(b_request)
+                for w_client in wlist:
+                    w_thread = threading.Thread(
+                        target=self.write, args=(w_client, b_response)
                     )
-                    r_thread.start()
-
-                if self._requests:
-                    b_request = self._requests.pop()
-                    b_response = self._handler(b_request)
-                    for w_client in wlist:
-                        w_thread = threading.Thread(
-                            target=self.write, args=(w_client, b_response)
-                        )
-                        w_thread.start()
-
-        except KeyboardInterrupt:
-            self.stop()
+                    w_thread.start()
 
     def read(self, client_sock):
         try:
             b_request = client_sock.recv(self._buffersize)
-        except Exception:
+        except ConnectionResetError as err:
             self._connections.remove(client_sock)
+            logging.info('Client connection was lost', exc_info=err)
+        except Exception as err:
+            logging.critical('Read exception raised', exc_info=err)
         else:
             if b_request:
                 self._requests.append(b_request)
@@ -98,9 +92,6 @@ class Server(metaclass=ServerVerifier):
     def write(self, client_sock, response):
         try:
             client_sock.send(response)
-        except Exception:
-            self._connections.remove(client_sock)
-
-    def stop(self):
-        logging.info('Server shutdown')
-        self._sock.close()
+        except Exception as err:
+            # self._connections.remove(client_sock)
+            logging.critical('Write exception raised', exc_info=err)
