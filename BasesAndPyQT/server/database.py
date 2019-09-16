@@ -3,7 +3,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from settings import CONNECTION_STRING, INSTALLED_MODULES, BASE_DIR
-
+from contextlib import contextmanager
 
 Base = declarative_base()
 engine = create_engine(CONNECTION_STRING)
@@ -25,3 +25,16 @@ def create_tables():
     import_models()
     # Создаем все таблицы
     Base.metadata.create_all(engine)
+
+
+@contextmanager
+def session_scope():
+    session = Session()
+    try:
+        yield session
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()

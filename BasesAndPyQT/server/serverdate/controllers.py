@@ -1,6 +1,7 @@
 from datetime import datetime
 from protocol import make_response
-from decorators import logged, login_required
+from decorators import logged
+from auth.decorators import login_required
 
 
 @logged
