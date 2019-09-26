@@ -1,30 +1,60 @@
-import os
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, String, Integer, Column, DateTime, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
-from settings import CONNECTION_STRING, INSTALLED_MODULES, BASE_DIR
+from sqlalchemy.orm import sessionmaker, relationship
+
+from datetime import datetime
 from contextlib import contextmanager
+
+from settings import CONNECTION_STRING, BASE_DIR
 
 Base = declarative_base()
 engine = create_engine(CONNECTION_STRING)
 Session = sessionmaker(bind=engine)
 
 
-def import_models():
-    """
-    Подключаем модели из всех приложений
-    """
-    module_name_list = [f'{item}.models' for item in INSTALLED_MODULES]
-    module_path_list = (os.path.join(BASE_DIR, item, 'models.py') for item in INSTALLED_MODULES)
-    for index, path in enumerate(module_path_list):
-        if os.path.exists(path):
-            __import__(module_name_list[index])
+class User(Base):
+    __tablename__ = 'users'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String, unique=True, nullable=False)
+    password = Column(String, nullable=False)
+    user_sessions = relationship('UserSession', back_populates='user')
+    messages = relationship('Message', back_populates='user')
+
+    def __init__(self, name, password):
+        self.name = str(name)
+        self.password = password
+
+    def __repr__(self):
+        return "<User ('%s','%s')>" % (self.id, self.name)
+
+
+class UserSession(Base):
+    __tablename__ = 'user_sessions'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    token = Column(String, nullable=False, unique=True)
+    created = Column(DateTime, default=datetime.now())
+    closed = Column(DateTime, nullable=True)
+    user_id = Column(Integer, ForeignKey('users.id'))
+    user = relationship('User', back_populates='user_sessions')
+
+    def __repr__(self):
+        return "<User Session ('%s','%s')>" % (self.token, self.user.name)
+
+
+class Message(Base):
+    __tablename__ = 'messages'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    data = Column(String, nullable=True)
+    created = Column(DateTime, default=datetime.now())
+    user_id = Column(Integer, ForeignKey('users.id'))
+    user = relationship('User', back_populates='messages')
 
 
 def create_tables():
-    import_models()
+    print(f'BASE_DIR = {BASE_DIR}')
     # Создаем все таблицы
     Base.metadata.create_all(engine)
+    print('Database was created')
 
 
 @contextmanager

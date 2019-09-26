@@ -10,7 +10,7 @@ from datetime import datetime
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QPushButton, QLabel,
     QTextEdit, QWidget, QVBoxLayout, QHBoxLayout,
-    QDesktopWidget
+    QDesktopWidget, QMessageBox
 )
 from array import array
 from itertools import islice
@@ -20,11 +20,14 @@ from Crypto.Random import get_random_bytes
 
 
 class Client:
-    def __init__(self, host, port, buffersize):
+    def __init__(self, host, port, buffersize, username='', password=''):
         self._host = host
         self._port = port
         self._buffersize = buffersize
         self._sock = socket()
+        self._session_token = None
+        self._username = username
+        self._password = password
 
     def __enter__(self):
         self.connect()
@@ -56,34 +59,54 @@ class Client:
 
     def read(self):
         while True:
-            try:
-                compressed_response = self._sock.recv(self._buffersize)
-            except Exception:
-                pass
+            response = self.read_response()
+            action = response.get('action')
+            if action == 'echo':
+                message = f'{response.get("username")}: {response.get("data")}'
+                if response.get("username") == self._username:
+                    message = f'<b>{message}</b>';
+                else:
+                    message = f'<i>{message}</i>';
             else:
-                encrypted_response = zlib.decompress(compressed_response)
+                message = str(data)
+            # print(f'data={data}')
+            self.message_list.append(message)
 
-                nonce, encrypted_response = get_chunk(encrypted_response, 16)
-                key, encrypted_response = get_chunk(encrypted_response, 16)
-                tag, encrypted_response = get_chunk(encrypted_response, 16)
+    def read_response(self, return_token=''):
+        response = None
+        try:
+            compressed_response = self._sock.recv(self._buffersize)
+        except Exception:
+            pass
+        else:
+            encrypted_response = zlib.decompress(compressed_response)
 
-                cipher = AES.new(key, AES.MODE_EAX, nonce)
+            nonce, encrypted_response = get_chunk(encrypted_response, 16)
+            key, encrypted_response = get_chunk(encrypted_response, 16)
+            tag, encrypted_response = get_chunk(encrypted_response, 16)
 
-                raw_response = cipher.decrypt_and_verify(encrypted_response, tag)
-                string_response = raw_response.decode()
-                logging.info(string_response)
+            cipher = AES.new(key, AES.MODE_EAX, nonce)
 
-                response = json.loads(raw_response)
-                data = response.get('data')
-                self.message_list.append(data)
+            raw_response = cipher.decrypt_and_verify(encrypted_response, tag)
+            string_response = raw_response.decode()
+            logging.info(string_response)
+
+            response = json.loads(raw_response)
+            if return_token and response.get('token') != return_token:
+                response = None
+
+        return response
 
     def send(self, action, data):
 
-        hash_obj = hashlib.sha256()
-        hash_obj.update(
-            str(datetime.now().timestamp()).encode()
-        )
-        token = hash_obj.hexdigest()
+        if self._session_token:
+            token = self._session_token
+        else:
+            hash_obj = hashlib.sha256()
+            hash_obj.update(
+                str(datetime.now().timestamp()).encode()
+            )
+            token = hash_obj.hexdigest()
 
         request = make_request(action, data, token)
         byte_request = json.dumps(request).encode()
@@ -99,31 +122,41 @@ class Client:
             }
         )
 
-        self.message_text.clear()
+        # self.message_text.clear()
         self._sock.send(compress_request)
 
         logging.info(f'Client send data: {data}')
+
+        return {'token': token}
 
     def init_ui(self):
 
         app = QApplication(sys.argv)
 
-        window = QMainWindow()
+        self.window = QMainWindow()
         # Установка заголовка и размеров главного окна
-        window.setGeometry(400, 600, 400, 600)
-        window.setWindowTitle('Messenger')
+        self.window.setGeometry(400, 600, 400, 600)
+        self.window.setWindowTitle('Messenger')
 
-        self.send_button = QPushButton("Send", window)
+        self.login_button = QPushButton("Login", self.window)
+        self.login_button.clicked.connect(self.click_login_button)
+        self.login_button.setMaximumHeight(64)
+
+        self.send_button = QPushButton("Send", self.window)
         self.send_button.clicked.connect(self.click_send_button)
         self.send_button.setMaximumHeight(64)
+        self.send_button.hide()
 
         self.message_text = QTextEdit()
         self.message_text.setMaximumHeight(64)
+        self.message_text.hide()
 
         self.message_list_label = QLabel("Messages:")
 
         self.message_list = QTextEdit()
         self.message_list.setReadOnly(True)
+
+        user_label = QLabel(f'User: {self._username}')
 
         main_layout = QVBoxLayout()
 
@@ -135,25 +168,53 @@ class Client:
         footer_layout.addWidget(self.message_text)
         footer_layout.addWidget(self.send_button)
 
+        main_layout.addWidget(user_label)
+        main_layout.addWidget(self.login_button)
         main_layout.addLayout(top_layout)
         main_layout.addLayout(footer_layout)
 
         central_widget = QWidget()
         central_widget.setLayout(main_layout)
-        window.setCentralWidget(central_widget)
+        self.window.setCentralWidget(central_widget)
 
         dsk_widget = QDesktopWidget()
         geometry = dsk_widget.availableGeometry()
         center_position = geometry.center()
-        frame_geometry = window.frameGeometry()
+        frame_geometry = self.window.frameGeometry()
         frame_geometry.moveCenter(center_position)
-        window.move(frame_geometry.topLeft())
+        self.window.move(frame_geometry.topLeft())
 
-        window.show()
+        self.window.show()
         sys.exit(app.exec_())
 
     def click_send_button(self):
         self.send('echo', self.message_text.toPlainText())
+        self.message_text.clear()
+
+    def click_login_button(self):
+
+        result = self.send('login', {'login': self._username, 'password': self._password})
+
+        data = None
+        for i in range(100):
+            response = self.read_response(result.get('token'))
+            data = response.get('data')
+            # print(f'{i}: {data}')
+            if data:
+                if 'token' in data:
+                    self._session_token = data.get('token')
+                    self.send_button.show()
+                    self.message_text.show()
+                    self.login_button.hide()
+                    self.listen()  # начинаем прием сообщений
+                else:
+                    QMessageBox.information(self.window, "Info", f'{data}')
+                break
+            # sleep(3)
+        if not data:
+            QMessageBox.about(self.window, 'Info', 'Timeout error')
+
+        # print(f'data={data}')
 
     def run(self):
         self.listen()
@@ -171,10 +232,11 @@ def make_request(action, data, token):
     request = {
         'action': action,
         'time': datetime.now().timestamp(),
-        'token': token
+        'token': token,
+        'data': data,
     }
-    if isinstance(data, dict):
-        request.update(data)
-    else:
-        request['data'] = data
+    # if isinstance(data, dict):
+    #     request.update(data)
+    # else:
+    #     request['data'] = data
     return request

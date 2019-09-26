@@ -1,11 +1,8 @@
 from protocol import make_response
 from decorators import logged
 from auth.decorators import login_required
-from database import Base, import_models, Session, session_scope
+from database import Base, Session, session_scope, Message
 from functools import reduce
-from .models import Message
-
-import_models()
 
 
 @logged
