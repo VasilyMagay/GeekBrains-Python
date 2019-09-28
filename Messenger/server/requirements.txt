@@ -1,0 +1,9 @@
+pyyaml
+jupyter
+chardet
+requests
+fabric3
+tabulate
+sqlalchemy
+pycryptodome
+sphinx
