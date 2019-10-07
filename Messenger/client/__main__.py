@@ -8,4 +8,4 @@ if __name__ == '__main__':
             config.get('host'), config.get('port'), config.get('buffersize'),
             config.get('username'), config.get('password')
     ) as my_client:
-        my_client.init_ui()
+        my_client.run()

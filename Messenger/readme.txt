@@ -1,16 +1,19 @@
 Запуск серверной части:
-server\fab server
+	server\fab server
+В файле config.yml указать имя сервера и порт.
 
 Регистрация нового пользователя:
-client\fab register
+	client\fab register
 
 Запуск клиента 1 (пользователь/пароль geek):
-client\fab client1
+	client\fab client1
+В файле config1.yml указать имя сервера и порт.
 
 Запуск клиента 2 (пользователь/пароль gb):
-client\fab client2
+	client\fab client2
+В файле config2.yml указать имя сервера и порт.
 
-Параметры запуска клиента (имя и пароль) храняться в файле config.yml.
+Параметры запуска клиента (имя и пароль) храняться в файле configN.yml.
 
 Урок 1.
 

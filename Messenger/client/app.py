@@ -19,7 +19,7 @@ from Crypto.Cipher import AES
 from Crypto.Random import get_random_bytes
 
 
-class Client:
+class Client(QMainWindow):
     def __init__(self, host, port, buffersize, username='', password=''):
         self._host = host
         self._port = port
@@ -28,6 +28,11 @@ class Client:
         self._session_token = None
         self._username = username
         self._password = password
+        self._connected = False
+
+        self.app = QApplication(sys.argv)
+        super().__init__()
+        self.init_ui()
 
     def __enter__(self):
         self.connect()
@@ -38,16 +43,26 @@ class Client:
         if self._sock:
             self._sock.close()
         if exc_type:
-            if not exc_type is KeyboardInterrupt:
+            # print(f'exc_type={exc_type}')
+            if exc_type not in (SystemExit, KeyboardInterrupt):
                 message = 'Client stopped with error'
-            logging.error(message, exc_info=exc_val)
+                logging.error(message, exc_info=exc_val)
         else:
             logging.info(message)
         return True
 
+    def closeEvent(self, event):
+        self.logout()
+        message = 'Client shutdown'
+        if self._sock:
+            self._sock.close()
+        logging.info(message)
+        super().closeEvent(event)
+
     def connect(self):
         try:
             self._sock.connect((self._host, self._port))
+            self._connected = True
         except Exception as err:
             logging.critical(f'Client connect error ({self._host}:{self._port})', exc_info=err)
         else:
@@ -60,17 +75,21 @@ class Client:
     def read(self):
         while True:
             response = self.read_response()
-            action = response.get('action')
-            if action == 'echo':
-                message = f'{response.get("username")}: {response.get("data")}'
-                if response.get("username") == self._username:
-                    message = f'<b>{message}</b>';
-                else:
-                    message = f'<i>{message}</i>';
-            else:
-                message = str(data)
-            # print(f'data={data}')
-            self.message_list.append(message)
+            if response:
+                action = response.get('action')
+                if action == 'echo':
+                    message = f'{response.get("username")}: {response.get("data")}'
+                    if response.get("username") == self._username:
+                        message = f'<b>{message}</b>';
+                    else:
+                        message = f'<i>{message}</i>';
+                    self.message_list.append(message)
+                elif action == 'logout' and response.get('token') == self._session_token:
+                    self._session_token = ''
+                    self.send_button.hide()
+                    self.message_text.hide()
+                    self.login_button.show()
+                    self.logout_button.hide()
 
     def read_response(self, return_token=''):
         response = None
@@ -131,18 +150,20 @@ class Client:
 
     def init_ui(self):
 
-        app = QApplication(sys.argv)
-
-        self.window = QMainWindow()
         # Установка заголовка и размеров главного окна
-        self.window.setGeometry(400, 600, 400, 600)
-        self.window.setWindowTitle('Messenger')
+        self.setGeometry(400, 600, 400, 600)
+        self.setWindowTitle('Messenger')
 
-        self.login_button = QPushButton("Login", self.window)
+        self.login_button = QPushButton("Login", self)
         self.login_button.clicked.connect(self.click_login_button)
         self.login_button.setMaximumHeight(64)
 
-        self.send_button = QPushButton("Send", self.window)
+        self.logout_button = QPushButton("Logout", self)
+        self.logout_button.clicked.connect(self.click_logout_button)
+        self.logout_button.setMaximumHeight(64)
+        self.logout_button.hide()
+
+        self.send_button = QPushButton("Send", self)
         self.send_button.clicked.connect(self.click_send_button)
         self.send_button.setMaximumHeight(64)
         self.send_button.hide()
@@ -170,28 +191,33 @@ class Client:
 
         main_layout.addWidget(user_label)
         main_layout.addWidget(self.login_button)
+        main_layout.addWidget(self.logout_button)
         main_layout.addLayout(top_layout)
         main_layout.addLayout(footer_layout)
 
         central_widget = QWidget()
         central_widget.setLayout(main_layout)
-        self.window.setCentralWidget(central_widget)
+        self.setCentralWidget(central_widget)
 
         dsk_widget = QDesktopWidget()
         geometry = dsk_widget.availableGeometry()
         center_position = geometry.center()
-        frame_geometry = self.window.frameGeometry()
+        frame_geometry = self.frameGeometry()
         frame_geometry.moveCenter(center_position)
-        self.window.move(frame_geometry.topLeft())
-
-        self.window.show()
-        sys.exit(app.exec_())
+        self.move(frame_geometry.topLeft())
 
     def click_send_button(self):
         self.send('echo', self.message_text.toPlainText())
         self.message_text.clear()
 
     def click_login_button(self):
+
+        if not self._connected:
+            self.connect()
+
+        if not self._connected:
+            QMessageBox.about(self, 'Info', 'Server not active')
+            return
 
         result = self.send('login', {'login': self._username, 'password': self._password})
 
@@ -206,19 +232,27 @@ class Client:
                     self.send_button.show()
                     self.message_text.show()
                     self.login_button.hide()
+                    self.logout_button.show()
                     self.listen()  # начинаем прием сообщений
                 else:
-                    QMessageBox.information(self.window, "Info", f'{data}')
+                    QMessageBox.information(self, "Info", f'{data}')
                 break
             # sleep(3)
         if not data:
-            QMessageBox.about(self.window, 'Info', 'Timeout error')
+            QMessageBox.about(self, 'Info', 'Timeout error')
 
         # print(f'data={data}')
 
     def run(self):
-        self.listen()
-        self.init_ui()
+        self.show()
+        sys.exit(self.app.exec_())
+
+    def logout(self):
+        if self._session_token:
+            self.send('logout', {})
+
+    def click_logout_button(self):
+        self.logout()
 
 
 def get_chunk(text, size):
@@ -235,8 +269,4 @@ def make_request(action, data, token):
         'token': token,
         'data': data,
     }
-    # if isinstance(data, dict):
-    #     request.update(data)
-    # else:
-    #     request['data'] = data
     return request
