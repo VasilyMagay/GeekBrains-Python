@@ -3,7 +3,7 @@ import logging
 import logging.handlers as handlers
 from argparse import ArgumentParser
 from handlers import handle_default_request
-from app import Server
+from app import AsyncServer
 from database import create_tables
 
 
@@ -44,10 +44,9 @@ if args.config:
         file_config = yaml.load(file, Loader=yaml.Loader)
         default_config.update(file_config)
 
-with Server(
-            default_config.get('host'),
-            default_config.get('port'),
-            default_config.get('buffersize'),
-            handle_default_request) as my_server:
-    my_server.start()
-    my_server.processing()
+my_server = AsyncServer(
+    default_config.get('host'),
+    default_config.get('port'),
+    default_config.get('buffersize'),
+    handle_default_request)
+my_server.start()

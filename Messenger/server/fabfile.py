@@ -2,7 +2,7 @@ from fabric.api import local
 
 
 def server():
-    local('python __main__.py')
+    local('python __main__.py -c config.yml')
 
 
 def migrate():
